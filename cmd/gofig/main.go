@@ -24,7 +24,7 @@ func main() {
 						Name:    "registry",
 						Aliases: []string{"r"},
 						Usage:   "The registry URL to verify your login credentials and retrieve your GOPROXY URL",
-						Value:   "https://dev.gofig.dev",
+						Value:   "https://gofig.dev",
 						EnvVars: []string{"GOFIG_REGISTRY"},
 					},
 					&cli.BoolFlag{
@@ -44,7 +44,7 @@ func main() {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:    "registry", // to remove from .netrc
-						Value:   "https://dev.gofig.dev",
+						Value:   "https://gofig.dev",
 						EnvVars: []string{"GOFIG_REGISTRY"},
 					},
 				},
