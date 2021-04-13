@@ -29,7 +29,7 @@ func writeNETRC(host, user, password, path string) error {
 	}
 	m := creds.FindMachine(host)
 	if m == nil {
-		m = creds.NewMachine(host, user, password, "")
+		creds.NewMachine(host, user, password, "")
 	} else {
 		m.UpdateLogin(user)
 		m.UpdatePassword(password)

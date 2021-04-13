@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -102,10 +104,11 @@ func login(c *cli.Context) error {
 		return fmt.Errorf("error parsing %q: %w", proxyURL, err)
 	}
 	writeNETRC(url.Hostname(), "gofig", token, "")
-	// TODO: integrate with existing GOPROXY/GONOSUMDB instead of overriding everything
-	args := []string{"env", "-w", fmt.Sprintf("GOPROXY=%s", proxyURL)}
-	if privatePaths := resp.GetPrivatePaths(); len(privatePaths) > 0 {
-		args = append(args, fmt.Sprintf("GONOSUMDB=%s", strings.Join(privatePaths, ",")))
+	args := []string{
+		"env", "-w",
+		getGOPROXYValue(c.Context, proxyURL),
+		getGONOSUMDBValue(c.Context, resp.GetPrivatePaths()),
+		getGOPRIVATEValue(c.Context, resp.GetPrivatePaths()),
 	}
 	cmd := exec.CommandContext(c.Context, "go", args...)
 	cmd.Stdout = os.Stdout
@@ -115,4 +118,55 @@ func login(c *cli.Context) error {
 		return fmt.Errorf("could not persist GOPROXY: %w", err)
 	}
 	return nil
+}
+
+func getGOPROXYValue(ctx context.Context, proxyURL string) string {
+	goproxyBts, err := exec.CommandContext(ctx, "go", "env", "GOPROXY").Output()
+	if err != nil {
+		log.Fatalf("could not get GOPROXY value: %v", err)
+	}
+	goproxy := strings.TrimSpace(string(goproxyBts))
+	if !strings.Contains(goproxy, proxyURL) {
+		goproxy = proxyURL + "," + goproxy
+	}
+	return fmt.Sprintf("GOPROXY=%s", goproxy)
+}
+
+func getGONOSUMDBValue(ctx context.Context, privatePaths []string) string {
+	gonosumdbBts, err := exec.CommandContext(ctx, "go", "env", "GONOSUMDB").Output()
+	if err != nil {
+		log.Fatalf("could not get GONOSUMDB: %v", err)
+	}
+	gonosumdb := strings.TrimSpace(string(gonosumdbBts))
+	for _, pp := range privatePaths {
+		if strings.Contains(gonosumdb, pp) {
+			continue
+		}
+		gonosumdb = fmt.Sprintf("%s,%s", gonosumdb, pp)
+	}
+	return fmt.Sprintf("GONOSUMDB=%s", gonosumdb)
+}
+
+func getGOPRIVATEValue(ctx context.Context, privatePaths []string) string {
+	privateMap := map[string]struct{}{}
+	for _, pp := range privatePaths {
+		privateMap[strings.TrimSpace(pp)] = struct{}{}
+	}
+	goprivateBts, err := exec.CommandContext(ctx, "go", "env", "GOPRIVATE").Output()
+	if err != nil {
+		log.Fatalf("could not get GOPRIVATE: %v", err)
+	}
+	goprivate := strings.Split(strings.TrimSpace(string(goprivateBts)), ",")
+	finalList := []string{}
+	for _, pp := range goprivate {
+		pp = strings.TrimSpace(pp)
+		if pp == "" {
+			continue
+		}
+		if _, ok := privateMap[pp]; ok {
+			continue
+		}
+		finalList = append(finalList, pp)
+	}
+	return fmt.Sprintf("GOPRIVATE=%s", strings.Join(finalList, ","))
 }
