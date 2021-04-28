@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 )
@@ -40,6 +39,12 @@ func TestGOPROXYValues(t *testing.T) {
 			proxyURL: "https://example.mygoproxy.com",
 			want:     "GOPROXY=proxy.golang.org|https://example.mygoproxy.com",
 		},
+		{
+			name:     "empty goproxy",
+			goproxy:  " ",
+			proxyURL: "https://myproxy.com",
+			want:     "GOPROXY=https://myproxy.com",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setEnv(t, "GOPROXY", tc.goproxy)
@@ -69,6 +74,12 @@ func TestGONOSUMDBValues(t *testing.T) {
 			gonosumdb:    "other.stuff/*,cli.gofig.dev/*,more.stuff/*",
 			privatePaths: []string{"private.stuff/*", "cli.gofig.dev/*"},
 			want:         "GONOSUMDB=other.stuff/*,cli.gofig.dev/*,more.stuff/*,private.stuff/*",
+		},
+		{
+			name:         "empty gonosumdb",
+			gonosumdb:    " ",
+			privatePaths: []string{"github.com/gofigdev/*"},
+			want:         "GONOSUMDB=github.com/gofigdev/*",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -116,8 +127,5 @@ func setEnv(t *testing.T, key, val string) {
 	t.Cleanup(func() {
 		os.Setenv(key, current)
 	})
-	fmt.Println("SETTING", key, val)
-	fmt.Println(os.Setenv(key, val))
-	fmt.Println(os.Getenv("GONOSUMDB"))
-	fmt.Println(os.Getenv(key))
+	os.Setenv(key, val)
 }

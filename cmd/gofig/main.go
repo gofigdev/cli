@@ -121,11 +121,13 @@ func login(c *cli.Context) error {
 }
 
 func getGOPROXYValue(ctx context.Context, proxyURL string) string {
-	goproxyBts, err := exec.CommandContext(ctx, "go", "env", "GOPROXY").Output()
+	goproxy, err := getGoEnv(ctx, "GOPROXY")
 	if err != nil {
-		log.Fatalf("could not get GOPROXY value: %v", err)
+		log.Fatal(err)
 	}
-	goproxy := strings.TrimSpace(string(goproxyBts))
+	if goproxy == "" {
+		return fmt.Sprintf("GOPROXY=%s", proxyURL)
+	}
 	if !strings.Contains(goproxy, proxyURL) {
 		goproxy = proxyURL + "," + goproxy
 	}
@@ -133,16 +135,19 @@ func getGOPROXYValue(ctx context.Context, proxyURL string) string {
 }
 
 func getGONOSUMDBValue(ctx context.Context, privatePaths []string) string {
-	gonosumdbBts, err := exec.CommandContext(ctx, "go", "env", "GONOSUMDB").Output()
+	gonosumdb, err := getGoEnv(ctx, "GONOSUMDB")
 	if err != nil {
-		log.Fatalf("could not get GONOSUMDB: %v", err)
+		log.Fatal(err)
 	}
-	gonosumdb := strings.TrimSpace(string(gonosumdbBts))
 	for _, pp := range privatePaths {
 		if strings.Contains(gonosumdb, pp) {
 			continue
 		}
-		gonosumdb = fmt.Sprintf("%s,%s", gonosumdb, pp)
+		if gonosumdb == "" {
+			gonosumdb = pp
+		} else {
+			gonosumdb = fmt.Sprintf("%s,%s", gonosumdb, pp)
+		}
 	}
 	return fmt.Sprintf("GONOSUMDB=%s", gonosumdb)
 }
@@ -152,21 +157,31 @@ func getGOPRIVATEValue(ctx context.Context, privatePaths []string) string {
 	for _, pp := range privatePaths {
 		privateMap[strings.TrimSpace(pp)] = struct{}{}
 	}
-	goprivateBts, err := exec.CommandContext(ctx, "go", "env", "GOPRIVATE").Output()
+	goprivateEnv, err := getGoEnv(ctx, "GOPRIVATE")
 	if err != nil {
-		log.Fatalf("could not get GOPRIVATE: %v", err)
+		log.Fatal(err)
 	}
-	goprivate := strings.Split(strings.TrimSpace(string(goprivateBts)), ",")
+	goprivate := strings.Split(goprivateEnv, ",")
 	finalList := []string{}
 	for _, pp := range goprivate {
 		pp = strings.TrimSpace(pp)
 		if pp == "" {
 			continue
 		}
+		// An enhancement would be to check if existing value
+		// "path matches" the given one and remove it.
 		if _, ok := privateMap[pp]; ok {
 			continue
 		}
 		finalList = append(finalList, pp)
 	}
 	return fmt.Sprintf("GOPRIVATE=%s", strings.Join(finalList, ","))
+}
+
+func getGoEnv(ctx context.Context, env string) (string, error) {
+	envBts, err := exec.CommandContext(ctx, "go", "env", env).Output()
+	if err != nil {
+		return "", fmt.Errorf("could not get %q: %v", env, err)
+	}
+	return strings.TrimSpace(string(envBts)), nil
 }
